@@ -1,0 +1,36 @@
+services:
+  petsearch:
+    container_name: pet_api
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file: ./.env
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mongo
+      - qdrant
+    volumes:
+      - .:/app
+
+  mongo:
+    image: mongo:7
+    container_name: pet_mongo
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+      - ./mongo-seed:/docker-entrypoint-initdb.d
+
+  qdrant:
+    container_name: pet_qdrant
+    image: qdrant/qdrant:v1.8.1
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+volumes:
+  mongo_data:
+  qdrant_data:

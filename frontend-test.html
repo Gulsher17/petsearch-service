@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Pet Search Test</title>
+  <style>
+    body{font-family:Arial;margin:40px;background:#fafafa;}
+    .row{display:flex;gap:8px;align-items:center;}
+    input{padding:8px;width:320px;}
+    button{padding:8px 12px;}
+    .card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;margin-top:10px;box-shadow:0 1px 4px rgba(0,0,0,.06);}
+    .muted{color:#6b7280;font-size:12px;}
+    .badges span{display:inline-block;background:#f3f4f6;margin:2px;padding:2px 8px;border-radius:999px;font-size:12px;}
+  </style>
+</head>
+<body>
+  <h1>🐾 Pet Search – Local Test</h1>
+  <div class="row">
+    <input id="q" placeholder="Try 'calm playful kitten'..." />
+    <button id="btn">Search</button>
+  </div>
+  <div id="out"></div>
+
+  <script>
+    const API = (p)=>`http://localhost:8000${p}`;
+
+    // Minimal HS256 JWT generator (dev-only) using secret 'dev-secret'
+    const enc = new TextEncoder();
+    function b64u(bytes){return btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
+    async function token(){
+      const header = b64u(enc.encode(JSON.stringify({alg:"HS256",typ:"JWT"})));
+      const payload = b64u(enc.encode(JSON.stringify({sub:"dev-user",iat:Math.floor(Date.now()/1000)})));
+      const data = `${header}.${payload}`;
+      const key = await crypto.subtle.importKey("raw", enc.encode("dev-secret"), {name:"HMAC", hash:"SHA-256"}, false, ["sign"]);
+      const sig = await crypto.subtle.sign("HMAC", key, enc.encode(data));
+      return `${data}.${b64u(sig)}`;
+    }
+    let JWT = "";
+    token().then(t=>JWT=t);
+
+    document.getElementById('btn').addEventListener('click', async () => {
+      const q = document.getElementById('q').value;
+      const res = await fetch(API(`/search?q=${encodeURIComponent(q)}`), {
+        headers: { "Authorization": `Bearer ${JWT}` }
+      });
+      const json = await res.json();
+      const out = document.getElementById('out');
+      out.innerHTML='';
+      (json.results||[]).forEach(p=>{
+        const tags = (p.tags||[]).map(t=>`<span>${t}</span>`).join('');
+        out.innerHTML += `
+          <div class="card">
+            <div><strong>${p.name}</strong> <span class="muted">(${p.breed||"Unknown"})</span></div>
+            <div class="muted">Age: ${p.age ?? 'N/A'} | Owner: ${p.owner_name ?? 'N/A'}</div>
+            <div>${(p.description||'').slice(0,200)}</div>
+            <div class="badges">${tags}</div>
+            <div class="muted">score: ${p._score} (vec ${p._vector_score}, boost ${p._lexical_boost})</div>
+          </div>`;
+      });
+    });
+  </script>
+</body>
+</html>
